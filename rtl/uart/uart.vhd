@@ -56,6 +56,7 @@ architecture rtl of uart is
     signal s_tx : std_logic := '1'; --! Output signal for transmitting data, driven low for start bit, then shifted out data bits, and driven high for stop bit    
     signal r_tx : std_logic := '1'; --! Output signal for transmitting data, driven low for start bit, then shifted out data bits, and driven high for stop bit    
     signal s_tx_busy : std_logic := '0'; --! Signal to indicate that transmission is in progress, used to prevent new transmissions from starting until the current one is complete    
+    signal r_tx_busy : std_logic := '0'; --! Register Signal to indicate that transmission is in progress, used to prevent new transmissions from starting until the current one is complete    
 
     type t_tx_fsm is (TX_IDLE, --! Waiting for transmit start signal
                       TX_WAIT_START, --! Start signal received, waiting for baud tick to start transmission
@@ -314,16 +315,18 @@ begin
             r_tx_data_cnt <= (others => '0');
             r_tx_data_store <= (others => '0');
             r_tx <= '1';
+            r_tx_busy <= '1';
         elsif rising_edge(i_clk) then
             r_tx_data_cnt <= s_tx_data_cnt; -- Output the data bit count for transmission
             r_tx_data_store <= s_tx_data_store; -- Output the data store for transmission
             r_tx <= s_tx; -- Output the transmit signal
+            r_tx_busy <= s_tx_busy; -- Output the transmit busy signal
         end if;
     end process p_tx_fsm_output;
 
     o_tx <= r_tx; -- Drive the output transmit signal
     o_rx_data <= r_rx_data_store; -- Drive the output received data signal
     o_rx_vld <= r_rx_vld;
-    o_tx_busy <= s_tx_busy; -- Drive the output transmit busy signal
+    o_tx_busy <= r_tx_busy; -- Drive the output transmit busy signal
 
 end architecture;
