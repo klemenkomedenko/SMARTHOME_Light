@@ -2,8 +2,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-library std;
-use std.env.all;
 
 entity uart_tb is
 end entity;
@@ -34,6 +32,37 @@ architecture sim of uart_tb is
 
     signal rx_line_mon_vld  : std_logic := '0';
     signal rx_line_mon_data : std_logic_vector(7 downto 0) := (others => '0');
+
+    function hex_nibble_to_char(n : std_logic_vector(3 downto 0)) return character is
+    begin
+        case n is
+            when "0000" => return '0';
+            when "0001" => return '1';
+            when "0010" => return '2';
+            when "0011" => return '3';
+            when "0100" => return '4';
+            when "0101" => return '5';
+            when "0110" => return '6';
+            when "0111" => return '7';
+            when "1000" => return '8';
+            when "1001" => return '9';
+            when "1010" => return 'A';
+            when "1011" => return 'B';
+            when "1100" => return 'C';
+            when "1101" => return 'D';
+            when "1110" => return 'E';
+            when "1111" => return 'F';
+            when others => return 'X';
+        end case;
+    end function;
+
+    function byte_to_hex(b : std_logic_vector(7 downto 0)) return string is
+        variable s : string(1 to 2);
+    begin
+        s(1) := hex_nibble_to_char(b(7 downto 4));
+        s(2) := hex_nibble_to_char(b(3 downto 0));
+        return s;
+    end function;
 
     procedure uart_send_byte(
         signal line_out : out std_logic;
@@ -85,7 +114,7 @@ architecture sim of uart_tb is
         end if;
 
         data := tmp;
-        report name & " byte=0x" & to_hstring(tmp);
+        report name & " byte=0x" & byte_to_hex(tmp);
     end procedure;
 
 begin
@@ -163,13 +192,13 @@ begin
         uart_send_byte(rx, c_rx1, c_BIT_PERIOD);
         wait until rising_edge(clk) and rx_vld = '1';
         assert rx_data = c_rx1
-            report "RX mismatch (1): got 0x" & to_hstring(rx_data) & " exp 0x" & to_hstring(c_rx1)
+            report "RX mismatch (1): got 0x" & byte_to_hex(rx_data) & " exp 0x" & byte_to_hex(c_rx1)
             severity error;
 
         uart_send_byte(rx, c_rx2, c_BIT_PERIOD);
         wait until rising_edge(clk) and rx_vld = '1';
         assert rx_data = c_rx2
-            report "RX mismatch (2): got 0x" & to_hstring(rx_data) & " exp 0x" & to_hstring(c_rx2)
+            report "RX mismatch (2): got 0x" & byte_to_hex(rx_data) & " exp 0x" & byte_to_hex(c_rx2)
             severity error;
 
         -- TX path test: request transmit and decode on the TX line monitor
@@ -181,7 +210,7 @@ begin
 
         wait until tx_mon_vld = '1';
         assert tx_mon_data = c_tx1
-            report "TX mismatch (1): got 0x" & to_hstring(tx_mon_data) & " exp 0x" & to_hstring(c_tx1)
+            report "TX mismatch (1): got 0x" & byte_to_hex(tx_mon_data) & " exp 0x" & byte_to_hex(c_tx1)
             severity error;
 
         tx_data <= c_tx2;
@@ -192,11 +221,11 @@ begin
 
         wait until tx_mon_vld = '1';
         assert tx_mon_data = c_tx2
-            report "TX mismatch (2): got 0x" & to_hstring(tx_mon_data) & " exp 0x" & to_hstring(c_tx2)
+            report "TX mismatch (2): got 0x" & byte_to_hex(tx_mon_data) & " exp 0x" & byte_to_hex(c_tx2)
             severity error;
 
         report "UART TB PASSED" severity note;
-        stop;
+        wait;
     end process;
 
 end architecture;
