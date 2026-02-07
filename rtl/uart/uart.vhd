@@ -25,8 +25,8 @@ end entity uart;
 
 architecture rtl of uart is
 
-    constant c_BAUD_TICK_CNT : unsigned(31 downto 0) := to_unsigned(g_CLK_FREQ / g_BAUD_RATE, 32); --! Number of clock cycles per baud tick, used for timing the reception of bits
-    constant c_BAUD_TICK_CNT_HALF : unsigned(31 downto 0) := to_unsigned(((g_CLK_FREQ / g_BAUD_RATE) / 2) - 7, 32); --! Number of clock cycles for half a baud tick, used for sampling the middle of the bit period, adjusted by 7 cycles to account for processing delays
+    constant c_BAUD_TICK_CNT : unsigned(31 downto 0) := to_unsigned((g_CLK_FREQ / g_BAUD_RATE), 32); --! Number of clock cycles per baud tick, used for timing the reception of bits
+    constant c_BAUD_TICK_CNT_HALF : unsigned(31 downto 0) := to_unsigned(((g_CLK_FREQ / g_BAUD_RATE) / 2)+7, 32); --! Number of clock cycles for half a baud tick, used for sampling the middle of the bit period, adjusted by 7 cycles to account for processing delays
     signal s_rx_baud_tick : std_logic := '0'; --! Baud tick signal for receiving data, generated when r_rx_baud_cnt reaches c_BAUD_TICK_CNT_HALF
     signal r_rx_baud_cnt  : unsigned(31 downto 0); --! Counter for generating baud tick for receiving data
 
@@ -37,6 +37,7 @@ architecture rtl of uart is
     signal r_rx_data_store : std_logic_vector(7 downto 0) := (others => '0'); --! Register to store received data bits before output
     signal s_rx_vld : std_logic := '0'; --! Signal to indicate that received data is valid and can be output, set when a full byte has been received and validated
     signal r_rx_vld : std_logic := '0'; --! Signal to indicate that received data is valid and can be output, set when a full byte has been received and validated
+    signal s_rx_start_bit : std_logic := '0'; --! Signal to indicate that a start bit has been detected, used to trigger the reception process
 
     type t_rx_fsm is (IDLE, --! RESET state, waiting for start bit
                       START, --! Start bit detected, waiting for data bits
@@ -80,19 +81,19 @@ begin
         if i_rst = '1' then
             r_rx_baud_cnt <= (others => '0');
         elsif rising_edge(i_clk) then
-            if (r_rx_shift = x"00") then -- Start bit detected
-                r_rx_baud_cnt <= (others => '0');
+            if (r_rx_shift = x"00" and s_rx_start_bit = '1') then -- Start bit detected
+                r_rx_baud_cnt <= c_BAUD_TICK_CNT + 3;
             else
-                if r_rx_baud_cnt = c_BAUD_TICK_CNT - 1 then
-                    r_rx_baud_cnt <= (others => '0');
+                if r_rx_baud_cnt = to_unsigned(0, r_rx_baud_cnt'length) then
+                    r_rx_baud_cnt <= c_BAUD_TICK_CNT - 1;
                 else
-                    r_rx_baud_cnt <= r_rx_baud_cnt + 1;
+                    r_rx_baud_cnt <= r_rx_baud_cnt - 1;
                 end if;
             end if;
         end if;
     end process p_rx_baud_cnt;
 
-    s_rx_baud_tick <= '1' when r_rx_baud_cnt = c_BAUD_TICK_CNT_HALF else '0'; 
+    s_rx_baud_tick <= '1' when r_rx_baud_cnt = to_unsigned(0, r_rx_baud_cnt'length) else '0'; 
 
     p_rx_fsm_sync : process(i_clk, i_rst)
     begin
@@ -111,7 +112,7 @@ begin
                 s_rx_fsm <= START;
 
             when START =>
-                if s_rx_baud_tick = '1' and r_rx_shift = x"00" then
+                if r_rx_shift = x"00" then
                     s_rx_fsm <= DATA;
                 else 
                     s_rx_fsm <= START; -- If start bit is not valid, return to IDLE
@@ -149,17 +150,19 @@ begin
         s_rx_data_cnt <= r_rx_data_cnt; -- Update synchronized data count
         s_rx_data_store <= r_rx_data_store; -- Update synchronized data store
         s_rx_vld <= '0'; -- Default to data not valid
+        s_rx_start_bit <= '0'; -- Default to start bit not detected
 
         case r_rx_fsm is
             when IDLE =>
 
             when START =>
                 s_rx_data_cnt <= (others => '0'); -- Reset data bit count at the start of reception
+                s_rx_start_bit <= '1'; -- Indicate that a start bit has been detected
 
             when DATA =>
                 if s_rx_baud_tick = '1' then
                     s_rx_data_cnt <= r_rx_data_cnt + 1; -- Increment data bit count on each baud tick
-                    s_rx_data_store <= r_rx_shift & r_rx_data_store(7 downto 1); -- Shift in received data bits into the data store
+                    s_rx_data_store <= r_rx_shift(7) & r_rx_data_store(7 downto 1); -- Shift in received data bits into the data store
                 else 
                     s_rx_data_cnt <= r_rx_data_cnt; -- Increment data bit count on each baud tick
                     s_rx_data_store <= r_rx_data_store; -- Shift in received data bits into the data store
@@ -279,6 +282,7 @@ begin
             when TX_IDLE =>
 
             when TX_WAIT_START =>
+                s_tx_data_store <= i_tx_data; -- Load data to be transmitted into the data store when transmission starts
 
             when TX_START_BIT =>
                 s_tx <= '0'; -- Transmit start bit (line low)
