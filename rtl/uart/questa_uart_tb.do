@@ -47,7 +47,7 @@ add wave -hex sim:/uart_tb/rx_line_mon_data
 add wave sim:/uart_tb/rx_line_mon_vld
 
 # Run until TB finishes (it ends with a wait; so stop on "UART TB PASSED" in transcript)
-run -all
+run 10000ns
 
 # If you prefer auto-exit, uncomment the next line and replace the TB's final 'wait;' with an 'assert false severity failure;'
 # quit -f

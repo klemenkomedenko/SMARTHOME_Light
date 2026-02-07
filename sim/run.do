@@ -5,8 +5,8 @@
 # Or from command line: vsim -do rtl/uart/questa_uart_tb.do
 
 # Make paths robust to where the do-file is invoked from
-set script_dir [file dirname [info script]]
-cd $script_dir
+#set script_dir [file dirname [info script]]
+#cd $script_dir
 
 # Clean + create work library
 if {[file exists work]} {
@@ -17,12 +17,12 @@ vmap work work
 
 # Compile DUT + TB
 # Use -2008 for modern syntax support; TB itself avoids std.env/to_hstring
-vcom -2008 -work work ../uart/uart.vhd
-vcom -2008 -work work ../pwm/pwm.vhd
-vcom -2008 -work work ../pwm/beat.vhd
-vcom -2008 -work work ../register/reg.vhd
-vcom -2008 -work work ../arbiter/arbiter.vhd
-vcom -2008 -work work ../top.vhd
+vcom -2008 -work work ../rtl/uart/uart.vhd
+vcom -2008 -work work ../rtl/pwm/pwm.vhd
+vcom -2008 -work work ../rtl/pwm/beat.vhd
+vcom -2008 -work work ../rtl/registers/reg.vhd
+vcom -2008 -work work ../rtl/arbiter/arbiter.vhd
+vcom -2008 -work work ../rtl/top.vhd
 vlog top_tb.v
 
 

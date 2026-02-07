@@ -87,12 +87,16 @@ begin
         if (i_rst = '1') then
             r_pwm <= '0';
         elsif rising_edge(i_clk) then
-            if (r_pwm_cnt = to_unsigned(0, r_pwm_cnt'length)) then
-                r_pwm <= '1';
-            elsif (r_pwm_cnt = r_pwm_cnt_limit) then
+            if (i_en_pwm = '1') then
+                if (r_pwm_cnt = to_unsigned(0, r_pwm_cnt'length)) then
+                    r_pwm <= '1';
+                elsif (r_pwm_cnt = r_pwm_cnt_limit) then
+                    r_pwm <= '0';
+                else
+                    r_pwm <= r_pwm;
+                end if;
+            else -- If PWM is disabled, ensure output is low
                 r_pwm <= '0';
-            else
-                r_pwm <= r_pwm;
             end if;
         end if;
     end process;

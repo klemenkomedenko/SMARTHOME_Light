@@ -102,4 +102,11 @@ begin
     o_inc_pwm <= r_inc_pwm;
     o_dec_pwm <= r_dec_pwm;
 
+    o_rdata <= r_init_dim(7 downto 0) when i_addr = x"00" else
+               r_init_dim(15 downto 8) when i_addr = x"01" else
+               r_en_pwm(((to_integer(unsigned(i_addr)) - 2 + 1)*8)-1 downto ((to_integer(unsigned(i_addr)) - 2)*8)) when (i_addr >= x"02" and i_addr <= x"09") else
+               r_inc_pwm(((to_integer(unsigned(i_addr)) - 10 + 1)*8)-1 downto ((to_integer(unsigned(i_addr)) - 10)*8)) when (i_addr >= x"0A" and i_addr <= x"11") else
+               r_dec_pwm(((to_integer(unsigned(i_addr)) - 18 + 1)*8)-1 downto ((to_integer(unsigned(i_addr)) - 18)*8)) when (i_addr >= x"12" and i_addr <= x"19") else
+               (others => '0');
+
 end architecture;

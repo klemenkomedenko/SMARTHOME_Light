@@ -49,28 +49,74 @@ module top_tb;
     );
 
     // Clock generation
-    initial clk = 0;
-    always #(CLK_PERIOD/2) clk = ~clk;
+    initial i_clk = 0;
+    always #(CLK_PERIOD/2) i_clk = ~i_clk;
 
     // Stimulus
     initial begin
         // Initialize inputs
         i_rst = 1;
-        repeat (40) @(posedge clk);
+        repeat (40) @(posedge i_clk);
         i_rst = 0;
-        repeat (40) @(posedge clk);
-        send_uart(8'h13); // 'K'
-        $stop;
+        repeat (40) @(posedge i_clk);
+        en_init(8'h45); // 'K'
+        en_pwm(64'h00000000050000f1);
+        repeat (200) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        inc_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        repeat (200) @(posedge i_clk);
+        // $stop;        inc_pwm(64'h00000000050000f1);
+        dec_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        dec_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        dec_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        dec_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        dec_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        dec_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        dec_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        dec_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        dec_pwm(64'h00000000050000f1);
+        repeat (1000000) @(posedge i_clk);
+        dec_pwm(64'h00000000050000f1);
     end
 
     task automatic send_uart;
         input [7:0] data;
         begin
-            @(posedge clk);
+            @(posedge i_clk);
             i_tx_data = data;
             i_tx_start = 1;
-            @(posedge clk);
+            @(posedge i_clk);
             i_tx_start = 0;
+            wait (o_tx_busy == 1);
+            @(posedge i_clk);
             wait (o_tx_busy == 0);
         end
     endtask
@@ -101,13 +147,49 @@ module top_tb;
         end
     endtask
 
-    task automatic en_pwm;
-        input [63:0] en;
+    task automatic inc_pwm;
+        input [63:0] inc;
+        begin
+            send_uart(8'h4B);
+            send_uart(8'h0A);
+            send_uart(8'h07);
+            send_uart(inc[7:0]);
+            send_uart(inc[15:8]);
+            send_uart(inc[23:16]);
+            send_uart(inc[31:24]);
+            send_uart(inc[39:32]);
+            send_uart(inc[47:40]);
+            send_uart(inc[55:48]);
+            send_uart(inc[63:56]);
+            send_uart(8'h0D);
+        end
+    endtask
+
+    task automatic dec_pwm;
+        input [63:0] dec;
+        begin
+            send_uart(8'h4B);
+            send_uart(8'h12);
+            send_uart(8'h07);
+            send_uart(dec[7:0]);
+            send_uart(dec[15:8]);
+            send_uart(dec[23:16]);
+            send_uart(dec[31:24]);
+            send_uart(dec[39:32]);
+            send_uart(dec[47:40]);
+            send_uart(dec[55:48]);
+            send_uart(dec[63:56]);
+            send_uart(8'h0D);
+        end
+    endtask
+
+    task automatic en_init;
+        input [7:0] init_val;
         begin
             send_uart(8'h4B);
             send_uart(8'h00);
             send_uart(8'h00);
-            send_uart(8'h12)
+            send_uart(init_val);
             send_uart(8'h0D);
         end
     endtask

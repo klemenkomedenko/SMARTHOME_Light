@@ -56,6 +56,9 @@ architecture rtl of arbiter is
     signal r_addr : unsigned(7 downto 0); --! Signal for output address bus
     signal s_we : std_logic; --! Signal for output write enable
 
+    signal s_uart_tx_data : std_logic_vector(7 downto 0); --! Signal for output UART transmit data bus
+    signal s_uart_tx_vld : std_logic; --! Signal for output UART transmit valid signal
+
 begin
 
     p_uart_tx_busy : process(i_clk, i_rst)
@@ -72,107 +75,111 @@ begin
     p_arb_fsm_sync : process(i_clk, i_rst)
     begin
         if i_rst = '1' then
-            s_arb_fsm <= IDLE;
+            r_arb_fsm <= IDLE;
         elsif rising_edge(i_clk) then
-            s_arb_fsm <= r_arb_fsm;
+            r_arb_fsm <= s_arb_fsm;
         end if;
     end process;
 
     p_arb_fsm : process(r_arb_fsm, i_uart_rx_vld, i_uart_rx_data, i_rdata, i_uart_tx_busy, r_wdata_cnt, r_wdata_len, r_rdata_cnt, r_rdata_len)
     begin
+        s_arb_fsm <= r_arb_fsm;
         case r_arb_fsm is
             when IDLE =>
-                r_arb_fsm <= WAIT_CMD;
+                s_arb_fsm <= WAIT_CMD;
 
             when WAIT_CMD =>
                 if i_uart_rx_data = x"4B" and i_uart_rx_vld = '1' then
-                    r_arb_fsm <= WADDR;
+                    s_arb_fsm <= WADDR;
                 elsif i_uart_rx_data = x"B4" and i_uart_rx_vld = '1' then
-                    r_arb_fsm <= RADDR;
+                    s_arb_fsm <= RADDR;
                 else
-                    r_arb_fsm <= WAIT_CMD;
+                    s_arb_fsm <= WAIT_CMD;
                 end if;
 
             when WADDR =>
                 if (i_uart_rx_vld = '1') then
-                    r_arb_fsm <= WLEN;
+                    s_arb_fsm <= WLEN;
                 else
-                    r_arb_fsm <= WADDR;
+                    s_arb_fsm <= WADDR;
                 end if;
 
             when WLEN =>
                 if (i_uart_rx_vld = '1') then
-                    r_arb_fsm <= WDATA;
+                    s_arb_fsm <= WDATA;
                 else
-                    r_arb_fsm <= WLEN;
+                    s_arb_fsm <= WLEN;
                 end if;
 
             when WDATA =>
                 if (i_uart_rx_vld = '1' and r_wdata_cnt = r_wdata_len) then
-                    r_arb_fsm <= WEOP;
+                    s_arb_fsm <= WEOP;
                 else
-                    r_arb_fsm <= WDATA;
+                    s_arb_fsm <= WDATA;
                 end if;
 
             when WEOP =>
                 if (i_uart_rx_vld = '1') then
-                    r_arb_fsm <= WAIT_CMD;
+                    s_arb_fsm <= WAIT_CMD;
                 else
-                    r_arb_fsm <= WEOP;
+                    s_arb_fsm <= WEOP;
                 end if;
 
             when RADDR =>
                 if (i_uart_rx_vld = '1') then
-                    r_arb_fsm <= RLEN;
+                    s_arb_fsm <= RLEN;
                 else
-                    r_arb_fsm <= RADDR;
+                    s_arb_fsm <= RADDR;
                 end if;
 
             when RLEN =>
                 if (i_uart_rx_vld = '1') then
-                    r_arb_fsm <= RRPLY;
+                    s_arb_fsm <= RRPLY;
                 else
-                    r_arb_fsm <= RLEN;
+                    s_arb_fsm <= RLEN;
                 end if;
 
             when RRPLY =>
-                r_arb_fsm <= WAIT_BUSY;
+                s_arb_fsm <= WAIT_BUSY;
 
             when WAIT_BUSY => 
                 if s_fe_uart_tx_busy = '0' then
-                    r_arb_fsm <= RDATA;
+                    s_arb_fsm <= RDATA;
                 else
-                    r_arb_fsm <= WAIT_BUSY;
+                    s_arb_fsm <= WAIT_BUSY;
                 end if;
 
             when RDATA =>
                 if (s_fe_uart_tx_busy = '1' and r_rdata_cnt = r_rdata_len) then
-                    r_arb_fsm <= REOP;
+                    s_arb_fsm <= REOP;
                 else
-                    r_arb_fsm <= WAIT_BUSY;
+                    s_arb_fsm <= WAIT_BUSY;
                 end if;
 
             when REOP =>
                 if s_fe_uart_tx_busy = '1' then
-                    r_arb_fsm <= WAIT_CMD;
+                    s_arb_fsm <= WAIT_CMD;
                 else
-                    r_arb_fsm <= REOP;
+                    s_arb_fsm <= REOP;
                 end if;
             
             when others =>
-                r_arb_fsm <= IDLE;
+                s_arb_fsm <= IDLE;
         end case;
     end process;
 
     p_arb_fsm_mux : process(r_arb_fsm, i_uart_rx_vld, i_uart_rx_data, i_rdata, i_uart_tx_busy, r_wdata_cnt, r_wdata_len,
-                            r_rdata_cnt, r_rdata_len, r_addr)
+                            r_rdata_cnt, r_rdata_len, r_addr, i_rdata)
     begin
-        s_wdata_len <= r_wdata_cnt;
-        s_wdata_cnt <= r_wdata_len;
-        s_rdata_len <= r_rdata_cnt;
-        s_rdata_cnt <= r_rdata_len;
+        s_wdata_len <= r_wdata_len;
+        s_wdata_cnt <= r_wdata_cnt;
+        s_rdata_len <= r_rdata_len;
+        s_rdata_cnt <= r_rdata_cnt;
         s_addr <= r_addr;
         s_we <= '0';
+        s_uart_tx_data <= (others => '0');
+        s_uart_tx_vld <= '0';
+
         case r_arb_fsm is
             when IDLE =>
 
@@ -182,6 +189,7 @@ begin
                 s_addr <= unsigned(i_uart_rx_data);
 
             when WLEN =>
+                s_wdata_cnt <= (others => '0');
                 s_wdata_len <= unsigned(i_uart_rx_data);
 
             when WDATA =>
@@ -202,10 +210,16 @@ begin
 
             when RLEN =>
                 s_rdata_len <= unsigned(i_uart_rx_data);
-
+                
             when RRPLY =>
+                s_uart_tx_data <= x"87";
+                s_uart_tx_vld <= '1';
+
+            when WAIT_BUSY => 
 
             when RDATA =>
+                s_uart_tx_data <= i_rdata;
+                s_uart_tx_vld <= '1';
 
             when REOP =>
         end case;
@@ -231,6 +245,9 @@ begin
     o_addr <= std_logic_vector(r_addr);
     o_we <= s_we;
     o_wdata <= i_uart_rx_data;
+
+    o_uart_tx_data <= s_uart_tx_data;
+    o_uart_tx_vld <= s_uart_tx_vld;
 
 
 end architecture;
