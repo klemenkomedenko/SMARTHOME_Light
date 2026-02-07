@@ -57,7 +57,7 @@ begin
                 r_en_pwm(((i+1)*8)-1 downto (i*8)) <= (others => '0');
             elsif rising_edge(i_clk) then
                 if (i_we = '1' and i_addr = std_logic_vector(to_unsigned(i+2, i_addr'length))) then
-                    r_en_pwm(((i+1)*8)-1 downto (i*8)) <= i_wdata;
+                    r_en_pwm(((i+1)*8)-1 downto (i*8)) <= i_wdata xor r_en_pwm(((i+1)*8)-1 downto (i*8));
                 else
                     r_en_pwm(((i+1)*8)-1 downto (i*8)) <= r_en_pwm(((i+1)*8)-1 downto (i*8));
                 end if;
