@@ -36,6 +36,7 @@ architecture rtl of arbiter is
                       RLEN, --! Setting read enable signal
                       RRPLY, --! Replying with read data to UART
                       RDATA, --! Reading data from memory
+                      WAIT_BUSY, --! Waiting for UART to be ready for next byte
                       REOP --! Ending read operation
                       ); --! Writing data to memory
     signal s_arb_fsm, r_arb_fsm : t_arb_fsm := IDLE;
@@ -51,8 +52,8 @@ architecture rtl of arbiter is
     signal r_uart_tx_busy : std_logic; --! Register for UART transmit busy signal
     signal s_fe_uart_tx_busy : std_logic; --! Signal for edge detection of UART transmit busy signal
 
-    signal s_addr : std_logic_vector(7 downto 0); --! Signal for output address bus
-    signal r_addr : std_logic_vector(7 downto 0); --! Signal for output address bus
+    signal s_addr : unsigned(7 downto 0); --! Signal for output address bus
+    signal r_addr : unsigned(7 downto 0); --! Signal for output address bus
     signal s_we : std_logic; --! Signal for output write enable
 
 begin
@@ -135,17 +136,20 @@ begin
                 end if;
 
             when RRPLY =>
-                if s_fe_uart_tx_busy = '1' then
+                r_arb_fsm <= WAIT_BUSY;
+
+            when WAIT_BUSY => 
+                if s_fe_uart_tx_busy = '0' then
                     r_arb_fsm <= RDATA;
                 else
-                    r_arb_fsm <= RRPLY;
+                    r_arb_fsm <= WAIT_BUSY;
                 end if;
 
             when RDATA =>
                 if (s_fe_uart_tx_busy = '1' and r_rdata_cnt = r_rdata_len) then
                     r_arb_fsm <= REOP;
                 else
-                    r_arb_fsm <= RDATA;
+                    r_arb_fsm <= WAIT_BUSY;
                 end if;
 
             when REOP =>
@@ -175,7 +179,7 @@ begin
             when WAIT_CMD =>
 
             when WADDR =>
-                s_addr <= i_uart_rx_data;
+                s_addr <= unsigned(i_uart_rx_data);
 
             when WLEN =>
                 s_wdata_len <= unsigned(i_uart_rx_data);
@@ -183,14 +187,18 @@ begin
             when WDATA =>
                 if (i_uart_rx_vld = '1') then
                     s_wdata_cnt <= r_wdata_cnt + 1;
+                    s_addr <= r_addr + 1;
+                    s_we <= '1';
                 else 
                     s_wdata_cnt <= r_wdata_cnt;
+                    s_addr <= r_addr;
+                    s_we <= '0';
                 end if;
 
             when WEOP =>
 
             when RADDR =>
-                s_addr <= i_uart_rx_data;
+                s_addr <= unsigned(i_uart_rx_data);
 
             when RLEN =>
                 s_rdata_len <= unsigned(i_uart_rx_data);
@@ -219,5 +227,10 @@ begin
              r_addr <= s_addr;
         end if;
     end process;
+
+    o_addr <= std_logic_vector(r_addr);
+    o_we <= s_we;
+    o_wdata <= i_uart_rx_data;
+
 
 end architecture;
