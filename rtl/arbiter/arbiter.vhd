@@ -36,8 +36,11 @@ architecture rtl of arbiter is
                       RLEN, --! Setting read enable signal
                       RRPLY, --! Replying with read data to UART
                       RDATA, --! Reading data from memory
+                      WAIT_BUSY_ACT, --! Waiting for UART to be ready for next byte
                       WAIT_BUSY, --! Waiting for UART to be ready for next byte
-                      REOP --! Ending read operation
+                      REOP, --! Ending read operation
+                      REOP_WAIT_BUSY_ACT, --! Waiting for UART to be ready for next byte
+                      REOP_WAIT_BUSY --! Waiting for UART to be ready for next byte
                       ); --! Writing data to memory
     signal s_arb_fsm, r_arb_fsm : t_arb_fsm := IDLE;
 
@@ -81,7 +84,7 @@ begin
         end if;
     end process;
 
-    p_arb_fsm : process(r_arb_fsm, i_uart_rx_vld, i_uart_rx_data, i_rdata, i_uart_tx_busy, r_wdata_cnt, r_wdata_len, r_rdata_cnt, r_rdata_len)
+    p_arb_fsm : process(r_arb_fsm, i_uart_rx_vld, i_uart_rx_data, i_rdata, i_uart_tx_busy, r_wdata_cnt, r_wdata_len, r_rdata_cnt, r_rdata_len, i_uart_tx_busy)
     begin
         s_arb_fsm <= r_arb_fsm;
         case r_arb_fsm is
@@ -140,29 +143,51 @@ begin
                 end if;
 
             when RRPLY =>
-                s_arb_fsm <= WAIT_BUSY;
+                s_arb_fsm <= WAIT_BUSY_ACT;
+
+            when WAIT_BUSY_ACT =>
+                if i_uart_tx_busy = '1' then
+                    s_arb_fsm <= WAIT_BUSY;
+                else
+                    s_arb_fsm <= WAIT_BUSY_ACT;
+                end if;
 
             when WAIT_BUSY => 
-                if s_fe_uart_tx_busy = '0' then
-                    s_arb_fsm <= RDATA;
+                if (i_uart_tx_busy = '0') then
+                    if (r_rdata_cnt = r_rdata_len) then
+                        s_arb_fsm <= REOP;
+                    else
+                        s_arb_fsm <= RDATA;
+                    end if;
                 else
                     s_arb_fsm <= WAIT_BUSY;
                 end if;
 
             when RDATA =>
-                if (s_fe_uart_tx_busy = '1' and r_rdata_cnt = r_rdata_len) then
-                    s_arb_fsm <= REOP;
-                else
-                    s_arb_fsm <= WAIT_BUSY;
-                end if;
+                s_arb_fsm <= WAIT_BUSY_ACT;
+
 
             when REOP =>
-                if s_fe_uart_tx_busy = '1' then
-                    s_arb_fsm <= WAIT_CMD;
+                if i_uart_tx_busy = '1' then
+                    s_arb_fsm <= REOP_WAIT_BUSY_ACT;
                 else
                     s_arb_fsm <= REOP;
                 end if;
             
+            when REOP_WAIT_BUSY_ACT =>
+                if i_uart_tx_busy = '1' then
+                    s_arb_fsm <= REOP_WAIT_BUSY;
+                else
+                    s_arb_fsm <= REOP_WAIT_BUSY_ACT;
+                end if;
+
+            when REOP_WAIT_BUSY =>
+                if i_uart_tx_busy = '0' then
+                    s_arb_fsm <= WAIT_CMD;
+                else
+                    s_arb_fsm <= REOP_WAIT_BUSY;
+                end if;
+
             when others =>
                 s_arb_fsm <= IDLE;
         end case;
@@ -209,19 +234,31 @@ begin
                 s_addr <= unsigned(i_uart_rx_data);
 
             when RLEN =>
-                s_rdata_len <= unsigned(i_uart_rx_data);
+                s_rdata_len <= unsigned(i_uart_rx_data) + 1;
                 
             when RRPLY =>
+                s_rdata_cnt <= (others => '0');
                 s_uart_tx_data <= x"87";
                 s_uart_tx_vld <= '1';
+
+            when WAIT_BUSY_ACT =>
 
             when WAIT_BUSY => 
 
             when RDATA =>
+                s_rdata_cnt <= r_rdata_cnt + 1;
                 s_uart_tx_data <= i_rdata;
                 s_uart_tx_vld <= '1';
 
             when REOP =>
+                s_rdata_cnt <= (others => '0');
+                s_uart_tx_data <= x"6D";
+                s_uart_tx_vld <= '1';
+
+            when REOP_WAIT_BUSY_ACT =>
+
+            when REOP_WAIT_BUSY =>
+
         end case;
     end process;
 

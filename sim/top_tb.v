@@ -60,6 +60,7 @@ module top_tb;
         i_rst = 0;
         repeat (40) @(posedge i_clk);
         en_init(8'h45); // 'K'
+        read_init();
         en_pwm(64'h00000000050000f1);
         repeat (200) @(posedge i_clk);
         inc_pwm(64'h00000000050000f1);
@@ -194,6 +195,32 @@ module top_tb;
         end
     endtask
 
+    task automatic read_init;
+        begin
+            send_uart(8'hB4);
+            send_uart(8'h00);
+            send_uart(8'h00);
+            fatch_init(0); // Expecting 8 bytes of data
+        end
+    endtask
 
 
+    reg [7:0] rx_uart_data;
+    integer i;
+    task automatic fatch_init;
+        input [7:0] len;
+        begin
+            receive_uart(rx_uart_data);
+            if (rx_uart_data == 8'h87) begin
+                $display("Received ACK for read_init");
+            end else begin
+                $display("Expected ACK (0x87), but received: %h", rx_uart_data);
+            end
+            for (i = 0; i < len + 1; i = i + 1) begin
+                receive_uart(rx_uart_data);
+                $display("Recived data: %h", rx_uart_data);
+            end
+            receive_uart(rx_uart_data);
+        end
+    endtask
 endmodule
