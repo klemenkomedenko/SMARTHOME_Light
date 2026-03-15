@@ -1,21 +1,16 @@
 # Ignore everything
 *
 
+# Allow directories so Git can search inside them
+!*/
+
+
 # Keep this file
-!radiant.rdf
+!*.rdf
+!*.cfg
+!*.ipx
+!*.xml
 
-# Keep clk_pll files
-!clk_pll/
-!clk_pll/clk_pll.cfg
-!clk_pll/clk_pll.ipx
-!clk_pll/design.xml
-!clk_pll/component.xml
-!clk_pll/ip_gen_cfg_file.cfg
-
-# Keep clk_osc files
-!clk_osc/
-!clk_osc/clk_osc.cfg
-!clk_osc/clk_osc.ipx
-!clk_osc/design.xml
-!clk_osc/component.xml
-!clk_osc/ip_gen_cfg_file.cfg
+# Explicitly ignore these
+radiant/promote.xml
+radiant/impl_1/
